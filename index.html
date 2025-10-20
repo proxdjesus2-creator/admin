@@ -4,66 +4,44 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Admin Catálogo</title>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
 <style>
-body{font-family:Inter,Arial;background:#0f1724;color:#f8fafc;margin:0;padding:0;}
-header{display:flex;align-items:center;justify-content:center;padding:20px;background:#111827;}
-header h1{color:#3b82f6;font-size:28px;}
-.wrap{max-width:900px;margin:20px auto;}
-.card{background:#111827;padding:20px;border-radius:12px;margin-bottom:20px;}
-input,textarea,select{width:100%;padding:10px;margin:6px 0;border-radius:8px;border:none;background:#0b1220;color:#fff;}
-button{padding:8px 12px;border:none;border-radius:8px;cursor:pointer;}
-.btn-primary{background:#06b6d4;color:#052022;margin-right:6px;}
-.btn-danger{background:#ef4444;color:#fff;}
-.product-item{display:flex;justify-content:space-between;align-items:center;padding:8px;border-bottom:1px solid #222;}
-.product-item div{flex:1;}
-.product-item img{width:50px;height:50px;object-fit:contain;border-radius:6px;margin-right:8px;}
-.discount-rule{display:flex;gap:8px;margin:4px 0;}
-.discount-rule input{flex:1;}
+  body{font-family:Arial, sans-serif;background:#001540;padding:10px;color:#ffffff;}
+  header{display:flex;align-items:center;margin-bottom:12px;}
+  header img{height:80px;margin-right:12px;}
+  h1{margin-bottom:12px;}
+  form{background:#0e2434;padding:12px;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,0.1);}
+  label{display:block;margin-top:6px;}
+  input,select,textarea{width:100%;padding:6px;margin-top:4px;border-radius:6px;border:1px solid #000000;}
+  button{margin-top:10px;padding:8px 12px;border:none;border-radius:6px;background:#06b6d4;color:#fffcfc;cursor:pointer;}
+  .product-list{margin-top:20px;}
+  .product-item{background:#000231;padding:8px;margin-bottom:6px;border-radius:6px;box-shadow:0 1px 4px rgba(0,0,0,0.1);display:flex;justify-content:space-between;align-items:center;}
+  .product-item button{background:#8b0000;margin-left:6px;}
 </style>
 </head>
 <body>
 
-<header><h1>Admin Catálogo</h1></header>
+<header>
 
-<div class="wrap">
+  <h1>Admin Catálogo</h1>
+</header>
 
-  <div class="card">
-    <h2>Añadir / Editar Producto</h2>
-    <form id="productForm">
-      <input type="hidden" id="productId">
-      <label>Nombre</label>
-      <input id="pName" required placeholder="Nombre del producto">
-      <label>Descripción</label>
-      <textarea id="pDesc" rows="2" placeholder="Descripción"></textarea>
-      <label>Precio</label>
-      <input id="pPrice" type="number" step="0.01" required placeholder="Precio">
-      <label>Categoría</label>
-      <input id="pCategory" placeholder="Ej: Bebidas, Electrónica">
-      <label>Unidades por fardo (opcional)</label>
-      <input id="pPack" placeholder="Ej: 6">
-      <label>Descuentos por cantidad</label>
-      <button type="button" id="addDiscount" class="btn-primary">Agregar regla de descuento</button>
-      <div id="discountContainer"></div>
-      <label>URL Imagen</label>
-      <input id="pImg" placeholder="https://...">
-      <div style="margin-top:10px;">
-        <button type="submit" class="btn-primary">Guardar Producto</button>
-        <button type="button" id="clearForm" class="btn-danger">Cancelar</button>
-      </div>
-    </form>
-  </div>
+<form id="productForm">
+  <label>Nombre</label><input type="text" id="name" required>
+  <label>Descripción</label><textarea id="desc"></textarea>
+  <label>Precio por fardo (Q)</label><input type="number" id="price" step="0.01" required>
+  <label>Cantidad por fardo</label><input type="number" id="qtyPerFardo" step="1" required>
+  <label>URL Imagen</label><input type="url" id="img" required>
+  <label>Categoría</label><input type="text" id="category" placeholder="Ej: Coca Cola" required>
+  <button type="submit">Añadir/Actualizar producto</button>
+</form>
 
-  <div class="card">
-    <h2>Lista de Productos</h2>
-    <div id="productList"></div>
-  </div>
+<div class="product-list" id="productList"></div>
 
-</div>
+<!-- Firebase -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
+import { getDatabase, ref, set, push, onValue, remove, update } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-database.js";
 
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script>
 const firebaseConfig = {
   apiKey: "AIzaSyCRzvwkeV8ceVnP5X2gA74a34iuClsc2qY",
   authDomain: "catalogo-f0b8e.firebaseapp.com",
@@ -74,90 +52,70 @@ const firebaseConfig = {
   appId: "1:100540032907:web:a6acac793ff5c85884318e",
   measurementId: "G-PZK0757PMK"
 };
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
 
-const productListEl = document.getElementById('productList');
-const form = document.getElementById('productForm');
-const clearFormBtn = document.getElementById('clearForm');
-const discountContainer = document.getElementById('discountContainer');
-const addDiscountBtn = document.getElementById('addDiscount');
+const form=document.getElementById("productForm");
+const productList=document.getElementById("productList");
 
-function loadProducts(){
-  db.ref('products').once('value').then(snapshot=>{
-    productListEl.innerHTML='';
-    snapshot.forEach(s=>{
-      const p = {...s.val(), id:s.key};
-      const div = document.createElement('div'); div.className='product-item';
-      div.innerHTML=`<img src="${p.img}" alt="${p.name}"><div>${p.name} - Q${p.price.toFixed(2)} - ${p.category||''}</div>
-      <button class="btn-primary">Editar</button>
-      <button class="btn-danger">Borrar</button>`;
-      div.querySelector('.btn-primary').onclick=()=>{editProduct(p);}
-      div.querySelector('.btn-danger').onclick=()=>{deleteProduct(p.id);}
-      productListEl.appendChild(div);
-    });
-  });
-}
+let editingId=null;
 
-function editProduct(p){
-  document.getElementById('productId').value=p.id;
-  document.getElementById('pName').value=p.name;
-  document.getElementById('pDesc').value=p.desc||'';
-  document.getElementById('pPrice').value=p.price;
-  document.getElementById('pCategory').value=p.category||'';
-  document.getElementById('pPack').value=p.pack||'';
-  document.getElementById('pImg').value=p.img||'';
-  discountContainer.innerHTML='';
-  if(p.discounts){
-    Object.keys(p.discounts).forEach(qty=>{
-      addDiscountRule(qty,p.discounts[qty]);
-    });
-  }
-}
-
-function deleteProduct(id){
-  if(confirm('¿Eliminar este producto?')){
-    db.ref('products/'+id).remove().then(()=>loadProducts());
-  }
-}
-
-form.addEventListener('submit', e=>{
+// Añadir/Actualizar producto
+form.onsubmit=async(e)=>{
   e.preventDefault();
-  const id=document.getElementById('productId').value;
-  const discountsObj={};
-  discountContainer.querySelectorAll('.discount-rule').forEach(r=>{
-    const qty = parseFloat(r.querySelector('.dQty').value);
-    const qPrice = parseFloat(r.querySelector('.dPrice').value);
-    if(qty && qPrice) discountsObj[qty]=qPrice;
+  const data={
+    name:document.getElementById("name").value,
+    desc:document.getElementById("desc").value,
+    price:parseFloat(document.getElementById("price").value),
+    qtyPerFardo:parseInt(document.getElementById("qtyPerFardo").value),
+    img:document.getElementById("img").value,
+    category:document.getElementById("category").value
+  };
+  if(editingId){
+    await update(ref(db,'products/'+editingId),data);
+    editingId=null;
+  }else{
+    const newRef=push(ref(db,'products'));
+    await set(newRef,data);
+  }
+  form.reset();
+};
+
+// Mostrar productos y botones eliminar/editar
+onValue(ref(db,'products'),snapshot=>{
+  productList.innerHTML="";
+  snapshot.forEach(child=>{
+    const p=child.val();
+    const div=document.createElement("div");
+    div.className="product-item";
+    div.innerHTML=`<span>${p.name} (${p.category}) - Q${p.price}</span>
+      <div>
+        <button data-edit="${child.key}">Editar</button>
+        <button data-del="${child.key}">Eliminar</button>
+      </div>`;
+    productList.appendChild(div);
   });
 
-  const newProduct={
-    name: document.getElementById('pName').value,
-    desc: document.getElementById('pDesc').value,
-    price: parseFloat(document.getElementById('pPrice').value),
-    category: document.getElementById('pCategory').value,
-    pack: document.getElementById('pPack').value||1,
-    discounts: discountsObj,
-    img: document.getElementById('pImg').value
-  };
-  if(id){
-    db.ref('products/'+id).update(newProduct).then(()=>{loadProducts(); form.reset(); discountContainer.innerHTML=''; document.getElementById('productId').value='';});
-  }else{
-    db.ref('products').push(newProduct).then(()=>{loadProducts(); form.reset(); discountContainer.innerHTML='';});
-  }
+  document.querySelectorAll("button[data-del]").forEach(btn=>{
+    btn.onclick=()=>remove(ref(db,'products/'+btn.dataset.del));
+  });
+
+  document.querySelectorAll("button[data-edit]").forEach(btn=>{
+    btn.onclick=()=>{
+      const key=btn.dataset.edit;
+      onValue(ref(db,'products/'+key),(snap)=>{
+        const d=snap.val();
+        document.getElementById("name").value=d.name;
+        document.getElementById("desc").value=d.desc;
+        document.getElementById("price").value=d.price;
+        document.getElementById("qtyPerFardo").value=d.qtyPerFardo;
+        document.getElementById("img").value=d.img;
+        document.getElementById("category").value=d.category;
+        editingId=key;
+      },{onlyOnce:true});
+    }
+  });
 });
-
-clearFormBtn.onclick=()=>{form.reset(); discountContainer.innerHTML=''; document.getElementById('productId').value='';}
-
-function addDiscountRule(qty='',price=''){
-  const div=document.createElement('div'); div.className='discount-rule';
-  div.innerHTML=`<input class="dQty" type="number" step="1" placeholder="Cantidad" value="${qty}"><input class="dPrice" type="number" step="0.01" placeholder="Descuento Q c/u" value="${price}"><button type="button" onclick="this.parentElement.remove()">Eliminar</button>`;
-  discountContainer.appendChild(div);
-}
-
-addDiscountBtn.onclick=()=>addDiscountRule();
-
-loadProducts();
 </script>
 </body>
 </html>
