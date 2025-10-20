@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Catálogo</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+<style>
+body{font-family:Inter,Arial;background:#0f1724;color:#f8fafc;margin:0;padding:0;}
+header{display:flex;align-items:center;justify-content:center;padding:20px;background:#111827;}
+header h1{color:#3b82f6;font-size:28px;}
+.wrap{max-width:900px;margin:20px auto;}
+.card{background:#111827;padding:20px;border-radius:12px;margin-bottom:20px;}
+input,textarea,select{width:100%;padding:10px;margin:6px 0;border-radius:8px;border:none;background:#0b1220;color:#fff;}
+button{padding:8px 12px;border:none;border-radius:8px;cursor:pointer;}
+.btn-primary{background:#06b6d4;color:#052022;margin-right:6px;}
+.btn-danger{background:#ef4444;color:#fff;}
+.product-item{display:flex;justify-content:space-between;align-items:center;padding:8px;border-bottom:1px solid #222;}
+.product-item div{flex:1;}
+.product-item img{width:50px;height:50px;object-fit:contain;border-radius:6px;margin-right:8px;}
+.discount-rule{display:flex;gap:8px;margin:4px 0;}
+.discount-rule input{flex:1;}
+</style>
+</head>
+<body>
+
+<header><h1>Admin Catálogo</h1></header>
+
+<div class="wrap">
+
+  <div class="card">
+    <h2>Añadir / Editar Producto</h2>
+    <form id="productForm">
+      <input type="hidden" id="productId">
+      <label>Nombre</label>
+      <input id="pName" required placeholder="Nombre del producto">
+      <label>Descripción</label>
+      <textarea id="pDesc" rows="2" placeholder="Descripción"></textarea>
+      <label>Precio</label>
+      <input id="pPrice" type="number" step="0.01" required placeholder="Precio">
+      <label>Categoría</label>
+      <input id="pCategory" placeholder="Ej: Bebidas, Electrónica">
+      <label>Unidades por fardo (opcional)</label>
+      <input id="pPack" placeholder="Ej: 6">
+      <label>Descuentos por cantidad</label>
+      <button type="button" id="addDiscount" class="btn-primary">Agregar regla de descuento</button>
+      <div id="discountContainer"></div>
+      <label>URL Imagen</label>
+      <input id="pImg" placeholder="https://...">
+      <div style="margin-top:10px;">
+        <button type="submit" class="btn-primary">Guardar Producto</button>
+        <button type="button" id="clearForm" class="btn-danger">Cancelar</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>Lista de Productos</h2>
+    <div id="productList"></div>
+  </div>
+
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyCRzvwkeV8ceVnP5X2gA74a34iuClsc2qY",
+  authDomain: "catalogo-f0b8e.firebaseapp.com",
+  databaseURL: "https://catalogo-f0b8e-default-rtdb.firebaseio.com",
+  projectId: "catalogo-f0b8e",
+  storageBucket: "catalogo-f0b8e.firebasestorage.app",
+  messagingSenderId: "100540032907",
+  appId: "1:100540032907:web:a6acac793ff5c85884318e",
+  measurementId: "G-PZK0757PMK"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+const productListEl = document.getElementById('productList');
+const form = document.getElementById('productForm');
+const clearFormBtn = document.getElementById('clearForm');
+const discountContainer = document.getElementById('discountContainer');
+const addDiscountBtn = document.getElementById('addDiscount');
+
+function loadProducts(){
+  db.ref('products').once('value').then(snapshot=>{
+    productListEl.innerHTML='';
+    snapshot.forEach(s=>{
+      const p = {...s.val(), id:s.key};
+      const div = document.createElement('div'); div.className='product-item';
+      div.innerHTML=`<img src="${p.img}" alt="${p.name}"><div>${p.name} - Q${p.price.toFixed(2)} - ${p.category||''}</div>
+      <button class="btn-primary">Editar</button>
+      <button class="btn-danger">Borrar</button>`;
+      div.querySelector('.btn-primary').onclick=()=>{editProduct(p);}
+      div.querySelector('.btn-danger').onclick=()=>{deleteProduct(p.id);}
+      productListEl.appendChild(div);
+    });
+  });
+}
+
+function editProduct(p){
+  document.getElementById('productId').value=p.id;
+  document.getElementById('pName').value=p.name;
+  document.getElementById('pDesc').value=p.desc||'';
+  document.getElementById('pPrice').value=p.price;
+  document.getElementById('pCategory').value=p.category||'';
+  document.getElementById('pPack').value=p.pack||'';
+  document.getElementById('pImg').value=p.img||'';
+  discountContainer.innerHTML='';
+  if(p.discounts){
+    Object.keys(p.discounts).forEach(qty=>{
+      addDiscountRule(qty,p.discounts[qty]);
+    });
+  }
+}
+
+function deleteProduct(id){
+  if(confirm('¿Eliminar este producto?')){
+    db.ref('products/'+id).remove().then(()=>loadProducts());
+  }
+}
+
+form.addEventListener('submit', e=>{
+  e.preventDefault();
+  const id=document.getElementById('productId').value;
+  const discountsObj={};
+  discountContainer.querySelectorAll('.discount-rule').forEach(r=>{
+    const qty = parseFloat(r.querySelector('.dQty').value);
+    const qPrice = parseFloat(r.querySelector('.dPrice').value);
+    if(qty && qPrice) discountsObj[qty]=qPrice;
+  });
+
+  const newProduct={
+    name: document.getElementById('pName').value,
+    desc: document.getElementById('pDesc').value,
+    price: parseFloat(document.getElementById('pPrice').value),
+    category: document.getElementById('pCategory').value,
+    pack: document.getElementById('pPack').value||1,
+    discounts: discountsObj,
+    img: document.getElementById('pImg').value
+  };
+  if(id){
+    db.ref('products/'+id).update(newProduct).then(()=>{loadProducts(); form.reset(); discountContainer.innerHTML=''; document.getElementById('productId').value='';});
+  }else{
+    db.ref('products').push(newProduct).then(()=>{loadProducts(); form.reset(); discountContainer.innerHTML='';});
+  }
+});
+
+clearFormBtn.onclick=()=>{form.reset(); discountContainer.innerHTML=''; document.getElementById('productId').value='';}
+
+function addDiscountRule(qty='',price=''){
+  const div=document.createElement('div'); div.className='discount-rule';
+  div.innerHTML=`<input class="dQty" type="number" step="1" placeholder="Cantidad" value="${qty}"><input class="dPrice" type="number" step="0.01" placeholder="Descuento Q c/u" value="${price}"><button type="button" onclick="this.parentElement.remove()">Eliminar</button>`;
+  discountContainer.appendChild(div);
+}
+
+addDiscountBtn.onclick=()=>addDiscountRule();
+
+loadProducts();
+</script>
+</body>
+</html>
