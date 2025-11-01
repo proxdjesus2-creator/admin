@@ -5,35 +5,35 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Admin Catálogo</title>
 <style>
-  body{font-family:Arial, sans-serif;background:#001540;padding:10px;color:#ffffff;}
+  body{font-family:Arial,sans-serif;background:#001540;padding:10px;color:#fff;}
   header{display:flex;align-items:center;margin-bottom:20px;}
   header img{height:80px;margin-right:12px;}
   h1{margin-bottom:12px;font-size:28px;}
   form{
-    background:#0e2434;padding:16px;border-radius:10px;
+    background:#0e2434;padding:20px;border-radius:12px;
     box-shadow:0 2px 8px rgba(0,0,0,0.3);margin-bottom:20px;
   }
   label{display:block;margin-top:10px;font-weight:bold;}
   input,select,textarea{
-    width:100%;padding:8px;margin-top:4px;border-radius:6px;border:1px solid #000000;
+    width:100%;padding:10px;margin-top:4px;border-radius:6px;border:1px solid #000;
     font-size:14px;
   }
   button{
-    margin-top:12px;padding:10px 14px;border:none;border-radius:6px;background:#06b6d4;color:#fffcfc;
+    margin-top:12px;padding:10px 14px;border:none;border-radius:6px;background:#06b6d4;color:#fff;
     cursor:pointer;font-weight:bold;
   }
-  .product-list{margin-top:20px;display:flex;flex-direction:column;gap:10px;}
+  .product-list{margin-top:20px;display:flex;flex-direction:column;gap:12px;}
   .product-item{
     background:#0c1a34;padding:12px;border-radius:8px;
     box-shadow:0 1px 4px rgba(0,0,0,0.3);display:flex;justify-content:space-between;align-items:center;
+    flex-wrap:wrap;
   }
-  .product-item span{font-size:16px;}
+  .product-item span{font-size:16px;margin-bottom:4px;}
   .product-item button{
     background:#8b0000;color:#fff;padding:6px 10px;font-size:14px;margin-left:6px;border-radius:6px;
     border:none;cursor:pointer;
   }
-  /* Botones editar/eliminar */
-  .btn-group{display:flex;gap:6px;}
+  .btn-group{display:flex;gap:6px;flex-wrap:wrap;}
 </style>
 </head>
 <body>
@@ -46,7 +46,9 @@
 <form id="productForm">
   <label>Nombre</label><input type="text" id="name" required>
   <label>Descripción</label><textarea id="desc"></textarea>
-  <label>Precio por fardo (Q)</label><input type="number" id="price" step="0.01" required>
+  <label>Precio fardo (Q)</label><input type="number" id="price" step="0.01" required>
+  <label>Precio media caja (Q)</label><input type="number" id="priceHalf" step="0.01">
+  <label>Precio unidad (Q)</label><input type="number" id="priceUnit" step="0.01">
   <label>Cantidad por fardo</label><input type="number" id="qtyPerFardo" step="1" required>
   <label>URL Imagen</label><input type="url" id="img" required>
   <label>Categoría</label>
@@ -79,18 +81,18 @@ const db = getDatabase(app);
 const form=document.getElementById("productForm");
 const productList=document.getElementById("productList");
 const categorySelect=document.getElementById("categorySelect");
-
 let editingId=null;
 
-// Añadir/Actualizar producto
 form.onsubmit=async(e)=>{
   e.preventDefault();
   let category = document.getElementById("category").value.trim();
-  if(!category) category = categorySelect.value; // Si no escribe, toma la seleccionada
+  if(!category) category = categorySelect.value;
   const data={
     name:document.getElementById("name").value,
     desc:document.getElementById("desc").value,
     price:parseFloat(document.getElementById("price").value),
+    priceHalf:parseFloat(document.getElementById("priceHalf").value) || 0,
+    priceUnit:parseFloat(document.getElementById("priceUnit").value) || 0,
     qtyPerFardo:parseInt(document.getElementById("qtyPerFardo").value),
     img:document.getElementById("img").value,
     category:category
@@ -105,7 +107,6 @@ form.onsubmit=async(e)=>{
   form.reset();
 };
 
-// Mostrar productos y botones eliminar/editar
 onValue(ref(db,'products'),snapshot=>{
   productList.innerHTML="";
   const categories=new Set();
@@ -116,7 +117,8 @@ onValue(ref(db,'products'),snapshot=>{
     const div=document.createElement("div");
     div.className="product-item";
     div.innerHTML=`
-      <span>${p.name} (${p.category}) - Q${p.price}</span>
+      <span>${p.name} (${p.category})</span>
+      <span>Fardo: Q${p.price} | Media: Q${p.priceHalf} | Unidad: Q${p.priceUnit}</span>
       <div class="btn-group">
         <button data-edit="${child.key}">Editar</button>
         <button data-del="${child.key}">Eliminar</button>
@@ -147,6 +149,8 @@ onValue(ref(db,'products'),snapshot=>{
         document.getElementById("name").value=d.name;
         document.getElementById("desc").value=d.desc;
         document.getElementById("price").value=d.price;
+        document.getElementById("priceHalf").value=d.priceHalf || 0;
+        document.getElementById("priceUnit").value=d.priceUnit || 0;
         document.getElementById("qtyPerFardo").value=d.qtyPerFardo;
         document.getElementById("img").value=d.img;
         document.getElementById("category").value=d.category;
